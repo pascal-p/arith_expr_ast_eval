@@ -7,7 +7,7 @@ module ArithExprASTEval
   class Evaluator
 
     class EvalError < StandardError; end
-    
+
     def initialize(ast, env={})
       @ops  = Operator.setup()   # ArithExprASTEval::Operator
       @operand = Operand.setup()
@@ -18,14 +18,14 @@ module ArithExprASTEval
     def self.run(ast, env={})
       self.new(ast, env).eval_()
     end
-    
+
     def eval_(node=@ast.root, env=@env)
       _s_eval(node, env)
     end
 
     private
     def _s_eval(node, env)
-      # STDOUT.print("==> node: #{node.inspect}\n")      
+      # STDOUT.print("==> node: #{node.inspect}\n")
       if node.leaf? # node.empty?
         return s_to_num(node)
       else
@@ -63,7 +63,7 @@ module ArithExprASTEval
     def s_to_num(oper)
       oper.val =~ /\./ ? oper.val.to_f : oper.val.to_i
     end
-    
+
   end
-  
+
 end
