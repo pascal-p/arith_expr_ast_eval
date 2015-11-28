@@ -1,5 +1,6 @@
 require_relative './btree'
 require_relative './operator'
+require_relative './operand'
 require_relative './tokenizer'
 
 module ArithExprASTEval
@@ -45,7 +46,6 @@ module ArithExprASTEval
     end
   end
 
-
   #
   # take an arithmetic expression (ar_expr) as input and build and return the AST
   # if ar_expr was syntactically correct, raise and exception otherwise 
@@ -53,12 +53,11 @@ module ArithExprASTEval
   
   class AST
 
-    @@number_rexp = /^(?:\-)?\d+(?:\.\d+)?$|^(?:\-)?\.\d+$/
-    
     def initialize(expr)
-      @ops  = Operator.setup() # ArithExprASTEval::Operator
-      @tree = BTree.new() # ArithExprASTEval::BTree
-      @expr = expr.gsub(' ', '')
+      @ops  = Operator.setup()   # ArithExprASTEval::Operator
+      @operand = Operand.setup() # ArithExprASTEval::Operand
+      @tree = BTree.new()        # ArithExprASTEval::BTree
+      @expr = expr.gsub(' ', '') # make sur all spaces are stripped off
     end
     
     def self.build(expr)
@@ -76,7 +75,11 @@ module ArithExprASTEval
       raise SyntaxError,
             "Unexpected expression or empty?" if tree_stack.empty?            
       _finish_ast_build(tree_stack, ops_stack) unless ops_stack.empty?
-      _ret_ast(tree_stack.pop) # return the AST btree
+      @ast = _ret_ast(tree_stack.pop) # return the AST btree      
+    end
+
+    def empty?
+      @ast.empty?
     end
     
     private              
@@ -84,18 +87,35 @@ module ArithExprASTEval
     # either numeric operand xor operator (no symbolic value)
     #
     def _proc(token, tree_stack, ops_stack)
+      #STDOUT.print("===> proc. token <#{token}>\n")
+      #
       if @ops.operator?(token)
+       # STDOUT.print("===> token <#{token}> is an OPERATOR\n")
         _op_case(token, ops_stack, tree_stack)
       #
-      elsif token =~ @@number_rexp
+      elsif @ops.func?(token)
+        #STDOUT.print("===> token <#{token}> is a FUNCTION EXPR\n")
+        # recursion here...
+        tree_stack << build(_func_case(token, ops_stack, tree_stack))
+        # now pop the function itself
+        op = ops_stack.pop
+        #STDOUT.print("===> token <#{token}> // AFTR REC CALL with op: #{op}\n")
+        _build_btree_n_push(tree_stack, op)
+        #
+      elsif token =~ @operand.num_rexp
+        #STDOUT.print("===> token <#{token}> is NUMERIC\n")
         tree_stack << ArithExprASTEval::Node.new(token)
-      #
-      elsif token =~ /^\(.+\)$/
+        #
+      elsif token =~ @ops.parens_rexp # /^\(.+\)$/
+        #STDOUT.print("===> token <#{token}> is PARENTHESES <#{@ops.parens_rexp}>?? \n")
+        # recursion here...
         tree_stack << build(token.sub(/^\(/, '').sub(/\)$/, ''))
       #
       else
         raise SyntaxError,
-              "Unexpected operator/operand found, got #{token} - valid operators: #{@ops.list} "
+              "Unexpected operator/operand found, got: #{token}" +
+              " valid operators: #{@ops.list} //" +
+              " valid functions: #{@ops.func_list}"
       end
     end
 
@@ -126,23 +146,58 @@ module ArithExprASTEval
       end
     end
 
-    def _build_btree(tree_stack, op)
-      # (!) assuming binary operator here            
+    def _func_case(token, ops_stack, tree_stack)
+      #raise NotImplementedError,                                                             
+      #      "#{__method__} no yet implemented"
+      if token =~ /^([a-z]+)\((.+)\)/
+        fun, expr = $1, $2
+        ops_stack << fun
+        expr
+      else
+        raise SyntaxError,
+              "Unexpected function expression - valid format is func(...)"
+      end
+      
+    end
+
+    # arity 2
+    def _build_btree_2(tree_stack, op)
       rnode = tree_stack.pop    # can be a btree (if rnode is a node) or a node  
       lnode = tree_stack.pop    # can be a btree (if lnode is a node) or a node
-      #
       if lnode.is_a?(BTree) && rnode.is_a?(BTree)
         BTree.new(op).add_subtrees(lnode, rnode) # ArithExprASTEval::BTree
-        #
+      #
       elsif lnode.is_a? BTree    # ArithExprASTEval::BTree
         lnode.newroot(op, :left).add_r(rnode)
-        #
+      #
       elsif rnode.is_a? BTree    # ArithExprASTEval::BTree
         rnode.newroot(op, :right).add_l(lnode)
         #
       else
         BTree.new(op).add_l(lnode).add_r(rnode) # ArithExprASTEval::BTree
       end
+    end
+
+    # arity 1
+    def _build_btree_1(tree_stack, op)
+      rnode = tree_stack.pop
+      if rnode.is_a?(BTree)
+        BTree.new(op).add_subtrees(nil, rnode)
+      else
+        BTree.new(op).add_r(rnode) # ArithExprASTEval::BTree
+      end 
+    end
+    
+    def _build_btree(tree_stack, op)
+      # (!) assuming binary operator here
+      if @ops.arity(op) == 2
+        _build_btree_2(tree_stack, op)
+      elsif @ops.arity(op) == 1
+        _build_btree_1(tree_stack, op)
+      else
+        raise SyntaxError,
+              "Operator arity is 2, function arity is 1 - but #{op} arity is not 1 nor 2"
+      end      
     end
 
     def _build_btree_n_push(tree_stack, op)

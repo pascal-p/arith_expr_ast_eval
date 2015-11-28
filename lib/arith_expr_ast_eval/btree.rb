@@ -18,8 +18,16 @@ module ArithExprASTEval
       self.val <=> oNode.val
     end
 
-    # TODO other properties
+    def leaf?
+      @lnode.nil? && @rnode.nil?
+    end
 
+    def splat
+      return [nil]  if @val.nil?
+      return [@val] if leaf?
+      return [@val, @lnode, @rnode]
+    end
+    
     private
     # mutate the value
     #def vmutate(val)
@@ -43,6 +51,14 @@ module ArithExprASTEval
       end
     end
 
+    def empty?
+      @node_count == 0
+    end
+
+    def leaf?
+      @node_count == 1
+    end
+    
     #
     # add newroot from val
     #
@@ -70,8 +86,8 @@ module ArithExprASTEval
     end
 
     def add_subtrees(ltree, rtree)
-      add_lsubtree(ltree)
-      add_rsubtree(rtree)
+      add_lsubtree(ltree) unless ltree.nil?
+      add_rsubtree(rtree) unless rtree.nil?
       self
     end
     
