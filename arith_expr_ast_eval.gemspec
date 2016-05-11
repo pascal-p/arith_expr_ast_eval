@@ -13,7 +13,7 @@ Gem::Specification.new do |spec|
   spec.description   = %q{Take an arithmetic expression and (try to) build the (corresponding) AST. 
 If the syntax is correct then the AST is evaluated (extension give and env for the evaluation)}
   spec.homepage      = ""
-  spec.license       = "BSD"
+  spec.license       = "BSD-2-Clause"
 
   # Prevent pushing this gem to RubyGems.org by setting 'allowed_push_host', or
   # delete this section to allow pushing this gem to any host.
